@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reminders</title>
+<style>
+  :root{
+    --bg:#f2f2f7;
+    --card:#ffffff;
+    --line:rgba(60,60,67,0.12);
+    --blue:#007aff;
+    --orange:#ff9f0a;
+    --green:#34c759;
+    --red:#ff3b30;
+    --text:#1c1c1e;
+    --secondary:#8e8e93;
+    --tertiary:#c7c7cc;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html{ -webkit-font-smoothing:antialiased; }
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height:100vh;
+    padding:0 0 100px;
+  }
+
+  /* large title header, Apple style */
+  .titlebar{
+    padding:64px 20px 8px;
+    max-width:600px; margin:0 auto;
+  }
+  .titlebar .kicker{
+    font-size:13px; font-weight:600; color:var(--orange);
+    letter-spacing:-0.01em; margin-bottom:2px;
+  }
+  h1{
+    font-size:34px; font-weight:700; letter-spacing:-0.02em; line-height:1.1;
+  }
+
+  .count-row{
+    max-width:600px; margin:0 auto; padding:10px 20px 18px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .count-pill{
+    font-size:13px; font-weight:600; color:var(--secondary);
+  }
+  .progress-track{
+    flex:1; height:3px; background:rgba(60,60,67,0.1); border-radius:2px; overflow:hidden;
+  }
+  .progress-fill{
+    height:100%; width:0%; background:var(--green); border-radius:2px;
+    transition:width .35s cubic-bezier(.25,.1,.25,1);
+  }
+
+  /* input card */
+  .add-card{
+    max-width:600px; margin:0 auto 18px; padding:0 20px;
+  }
+  .add-inner{
+    background:var(--card); border-radius:14px;
+    display:flex; align-items:center; gap:10px;
+    padding:4px 6px 4px 16px;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+  }
+  .add-inner input{
+    flex:1; border:none; outline:none; background:transparent;
+    font-size:17px; font-family:inherit; color:var(--text); padding:12px 0;
+  }
+  .add-inner input::placeholder{ color:var(--tertiary); }
+  .add-inner button{
+    width:36px; height:36px; border-radius:50%; border:none;
+    background:var(--blue); color:#fff; font-size:19px; font-weight:600;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    transition:transform .12s, opacity .12s; flex-shrink:0;
+  }
+  .add-inner button:active{ transform:scale(0.9); }
+  .add-inner button:disabled{ opacity:0.35; cursor:default; }
+
+  /* segmented control, Apple style */
+  .filters{
+    max-width:600px; margin:0 auto 20px; padding:0 20px;
+  }
+  .segment{
+    display:flex; background:rgba(118,118,128,0.12); border-radius:9px; padding:2px;
+  }
+  .segment button{
+    flex:1; border:none; background:transparent; padding:6px 0;
+    font-size:13px; font-weight:600; color:var(--text); border-radius:7px;
+    cursor:pointer; transition:background .18s, box-shadow .18s; font-family:inherit;
+  }
+  .segment button.active{
+    background:#ffffff; box-shadow:0 1px 2px rgba(0,0,0,0.12);
+  }
+
+  /* list card */
+  .list-card{
+    max-width:600px; margin:0 auto; padding:0 20px;
+  }
+  .list-inner{
+    background:var(--card); border-radius:14px; overflow:hidden;
+    box-shadow:0 1px 2px rgba(0,0,0,0.04);
+  }
+  .task{
+    display:flex; align-items:flex-start; gap:12px;
+    padding:12px 16px; position:relative;
+    border-bottom:1px solid var(--line);
+  }
+  .task:last-child{ border-bottom:none; }
+
+  .check{
+    width:22px; height:22px; border-radius:50%; border:1.6px solid var(--tertiary);
+    flex-shrink:0; cursor:pointer; margin-top:1px; position:relative;
+    display:flex; align-items:center; justify-content:center;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  .check:active{ transform:scale(0.88); }
+  .task.done .check{ background:var(--blue); border-color:var(--blue); }
+  .check svg{ width:12px; height:12px; opacity:0; transition:opacity .1s; }
+  .task.done .check svg{ opacity:1; }
+
+  .task-text{
+    flex:1; font-size:17px; line-height:1.35; word-break:break-word;
+    outline:none; cursor:text; padding-top:0px;
+    transition:color .15s;
+  }
+  .task.done .task-text{ color:var(--tertiary); text-decoration:line-through; }
+
+  .task-actions{
+    display:flex; gap:2px; opacity:0; transition:opacity .12s; flex-shrink:0;
+  }
+  .task:hover .task-actions{ opacity:1; }
+  .icon-btn{
+    width:28px; height:28px; border:none; background:transparent; cursor:pointer;
+    color:var(--secondary); display:flex; align-items:center; justify-content:center;
+    border-radius:6px; transition:background .12s, color .12s;
+  }
+  .icon-btn:hover{ background:rgba(60,60,67,0.06); }
+  .icon-btn.del:hover{ color:var(--red); }
+  .icon-btn.edit:hover{ color:var(--blue); }
+
+  .task.removing{ animation:swipe-out .22s ease-in forwards; }
+  @keyframes swipe-out{
+    to{ opacity:0; transform:translateX(60px); max-height:0; padding-top:0; padding-bottom:0; margin:0; }
+  }
+
+  /* empty state */
+  .empty{
+    text-align:center; padding:60px 20px; color:var(--secondary);
+  }
+  .empty-icon{
+    width:56px; height:56px; margin:0 auto 14px; opacity:0.35;
+  }
+  .empty p{ font-size:15px; font-weight:500; }
+  .empty .sub{ font-size:13px; color:var(--tertiary); margin-top:4px; }
+
+  footer{
+    max-width:600px; margin:24px auto 0; padding:0 20px;
+    text-align:center; font-size:12px; color:var(--tertiary);
+  }
+</style>
+</head>
+<body>
+  <div class="titlebar">
+    <div class="kicker">Today</div>
+    <h1>Reminders</h1>
+  </div>
+
+  <div class="count-row">
+    <span class="count-pill" id="countLabel">0 remaining</span>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <div class="add-card">
+    <div class="add-inner">
+      <input type="text" id="taskInput" placeholder="New Reminder" maxlength="200" autocomplete="off">
+      <button id="addBtn" disabled aria-label="Add reminder">+</button>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="segment" id="filters">
+      <button class="active" data-filter="all">All</button>
+      <button data-filter="active">Active</button>
+      <button data-filter="completed">Completed</button>
+    </div>
+  </div>
+
+  <div class="list-card">
+    <div class="list-inner" id="list"></div>
+  </div>
+
+  <footer>Saved on this device</footer>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'thiranex_todo_tasks_v1';
+  const listEl = document.getElementById('list');
+  const inputEl = document.getElementById('taskInput');
+  const addBtn = document.getElementById('addBtn');
+  const filtersEl = document.getElementById('filters');
+  const progressFill = document.getElementById('progressFill');
+  const countLabel = document.getElementById('countLabel');
+
+  let tasks = loadTasks();
+  let filter = 'all';
+
+  function loadTasks(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){
+      console.error('Failed to load tasks', e);
+      return [];
+    }
+  }
+
+  function saveTasks(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }catch(e){
+      console.error('Failed to save tasks', e);
+    }
+  }
+
+  function uid(){
+    return 't' + Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+  }
+
+  function addTask(text){
+    const trimmed = text.trim();
+    if(!trimmed) return;
+    tasks.unshift({ id: uid(), text: trimmed, done: false, createdAt: Date.now() });
+    saveTasks();
+    render();
+  }
+
+  function deleteTask(id){
+    const node = listEl.querySelector(`[data-id="${id}"]`);
+    if(node){
+      node.classList.add('removing');
+      node.addEventListener('animationend', () => {
+        tasks = tasks.filter(t => t.id !== id);
+        saveTasks();
+        render();
+      }, { once:true });
+    } else {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      render();
+    }
+  }
+
+  function toggleTask(id){
+    const t = tasks.find(t => t.id === id);
+    if(t){ t.done = !t.done; saveTasks(); render(); }
+  }
+
+  function editTask(id, newText){
+    const t = tasks.find(t => t.id === id);
+    if(!t) return;
+    const trimmed = newText.trim();
+    if(trimmed){ t.text = trimmed; }
+    saveTasks();
+    render();
+  }
+
+  function getFiltered(){
+    if(filter === 'active') return tasks.filter(t => !t.done);
+    if(filter === 'completed') return tasks.filter(t => t.done);
+    return tasks;
+  }
+
+  function updateProgress(){
+    const total = tasks.length;
+    const done = tasks.filter(t => t.done).length;
+    const remaining = total - done;
+    const pct = total === 0 ? 0 : Math.round((done/total)*100);
+    progressFill.style.width = pct + '%';
+    countLabel.textContent = total === 0 ? 'No reminders' : `${remaining} remaining`;
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  const CHECK_SVG = `<svg viewBox="0 0 12 12" fill="none"><path d="M2 6L4.8 8.8L10 3" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+  function render(){
+    updateProgress();
+    const filtered = getFiltered();
+    listEl.innerHTML = '';
+
+    if(filtered.length === 0){
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      let msg = 'No reminders', sub = 'Add one above to get started.';
+      if(filter === 'active' && tasks.length){ msg = 'All done'; sub = 'Nothing active right now.'; }
+      if(filter === 'completed' && tasks.length){ msg = 'Nothing completed yet'; sub = 'Check off a reminder to see it here.'; }
+      empty.innerHTML = `<p>${escapeHtml(msg)}</p><div class="sub">${escapeHtml(sub)}</div>`;
+      listEl.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'task' + (t.done ? ' done' : '');
+      item.dataset.id = t.id;
+      item.innerHTML = `
+        <div class="check" data-action="toggle" role="checkbox" aria-checked="${t.done}" tabindex="0">${CHECK_SVG}</div>
+        <div class="task-text" data-action="text" contenteditable="false" spellcheck="false">${escapeHtml(t.text)}</div>
+        <div class="task-actions">
+          <button class="icon-btn edit" data-action="edit" title="Edit" aria-label="Edit reminder">✎</button>
+          <button class="icon-btn del" data-action="delete" title="Delete" aria-label="Delete reminder">✕</button>
+        </div>
+      `;
+      listEl.appendChild(item);
+    });
+  }
+
+  // single delegated listener for the whole list
+  listEl.addEventListener('click', (e) => {
+    const actionEl = e.target.closest('[data-action]');
+    if(!actionEl) return;
+    const taskEl = e.target.closest('.task');
+    if(!taskEl) return;
+    const id = taskEl.dataset.id;
+    const action = actionEl.dataset.action;
+
+    if(action === 'toggle'){
+      toggleTask(id);
+    } else if(action === 'delete'){
+      deleteTask(id);
+    } else if(action === 'edit'){
+      const textEl = taskEl.querySelector('.task-text');
+      textEl.contentEditable = 'true';
+      textEl.focus();
+      document.getSelection().selectAllChildren(textEl);
+    }
+  });
+
+  listEl.addEventListener('keydown', (e) => {
+    const checkEl = e.target.closest('.check');
+    if(checkEl && (e.key === 'Enter' || e.key === ' ')){
+      e.preventDefault();
+      const taskEl = e.target.closest('.task');
+      toggleTask(taskEl.dataset.id);
+      return;
+    }
+    const textEl = e.target.closest('.task-text[contenteditable="true"]');
+    if(textEl){
+      if(e.key === 'Enter'){
+        e.preventDefault();
+        textEl.blur();
+      } else if(e.key === 'Escape'){
+        render();
+      }
+    }
+  });
+
+  listEl.addEventListener('blur', (e) => {
+    const textEl = e.target.closest ? e.target.closest('.task-text[contenteditable="true"]') : null;
+    if(textEl){
+      const taskEl = e.target.closest('.task');
+      editTask(taskEl.dataset.id, textEl.textContent);
+    }
+  }, true);
+
+  function refreshAddBtn(){
+    addBtn.disabled = inputEl.value.trim().length === 0;
+  }
+
+  addBtn.addEventListener('click', () => {
+    addTask(inputEl.value);
+    inputEl.value = '';
+    refreshAddBtn();
+    inputEl.focus();
+  });
+
+  inputEl.addEventListener('input', refreshAddBtn);
+
+  inputEl.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter' && inputEl.value.trim()){
+      addTask(inputEl.value);
+      inputEl.value = '';
+      refreshAddBtn();
+    }
+  });
+
+  filtersEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    filter = btn.dataset.filter;
+    [...filtersEl.children].forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
